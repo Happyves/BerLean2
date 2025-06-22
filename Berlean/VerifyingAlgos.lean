@@ -7,7 +7,10 @@ open Lean Meta Elab Tactic
 -- # Verifying algorithms vs. algorithms that certify
 
 /-
-Intro
+This is a minimalist exposition of what it means to verify an algorithm in Lean and how
+it differs from writing an algorithm that produces proofs.
+
+We assume little to no prerequisites.
 -/
 
 
@@ -17,12 +20,23 @@ namespace Expo
 
 universe u
 
+-- This is how we define linked lists in Lean
 inductive List (α : Type u) where
 | nil
 | cons (val : α) (nx : List α)
 deriving Repr
 
+/-
+If you've never programmed before, here's a short explanation. The above are instructions
+for your computer on how to store the entries of the list. `cons` will, given the adresses
+of `val` and the remainder of the list `nx`, allocate new memory that contains the latter
+adresses, at a new adress it returns. `nil` instructs that we hav reached the end of the list.
 
+This definition makes use of type polymorphism : we use it to define lists of natural number,
+integers, or even lists of lists.
+-/
+
+-- This is how we define the list 1,2,3
 def OneTwoThree : List Nat :=
   .cons 1 <| .cons 2 <| .cons 3 .nil
 
@@ -30,33 +44,59 @@ def OneTwoThree : List Nat :=
 def FourFive : List Nat :=
   .cons 4 <| .cons 5 .nil
 
-
+-- We define the length of the list as a function that takes a list and returns a natural number
 def List.length {α : Type u} : List α → Nat
+  -- Since lisls are built from `cons` and `nil`, we have to specify what to do in each case
   | .nil => 0
+    -- the empty list has length 0
   | .cons _ nx => 1 + nx.length
+    -- for a list strating with `cons`, we recursivly compute the length of its remainder,
+    -- and increment it by 1.
 
-
+-- This command allows us to interpret code right away
 #eval OneTwoThree.length
 #eval FourFive.length
 
-
+-- Here's how we append two list
 def List.append {α : Type u} : List α → List α → List α
   | .nil, l => l
   | .cons val nx, l => .cons val <| append nx l
 
+-- 1,2,3 and 4,5 yields 1,2,3,4,5
 #eval List.append OneTwoThree FourFive
 
 def OneToFive :=
   List.append OneTwoThree FourFive
 
--- **Todo** show `(· ++ ·).length = ·.length + ·.length` to highlight induction, and fun-induction
+-- Let's prove that the length of two appended lists is the sum of their lengths
+theorem theoremName {α : Type u} (l L : List α) : (l.append L).length = l.length + L.length := by
+  -- Click at the end of the lines of code and look at the "InfoView" to your right to follow along
+  induction l with
+  -- The proof is by induction on the list
+    | nil => -- the base case
+      -- Here, we show the result for empt lists
+      dsimp [List.append]
+      dsimp [List.length]
+      rw [Nat.zero_add]
+    | cons v l ih => -- the induction step
+      -- Assume the result is true the the remainder of a list built with `cons` :
+      -- we show that we may then derive the result for the list.
+      dsimp [List.append]
+      dsimp [List.length]
+      rw [ih]
+      rw [Nat.add_assoc]
 
-
+-- Next up, we define what ot means for a list to be a prefix of another
 inductive List.isPrefixOf {α : Type u}  : List α → List α → Prop where
+  -- We give two rule from which we allow the relation to follow :
   | nilCase (l : List α) : List.isPrefixOf .nil l
+      -- the empty list is the prefix of any list
   | consCase (val : α) {l L : List α} (proof : List.isPrefixOf l L) : List.isPrefixOf (.cons val l) (.cons val L)
+      -- if two lists have the same lead, and the tail of the first is a prefix of that of the second
+      -- the the first is a prefix of the second
 
-
+-- With these rules, we can "build" proofs similarly to how we built lists
+-- Here's a proof that 1,2,3 is a prefix of 1,2,3,4,5
 theorem termStyleProof : OneTwoThree.isPrefixOf OneToFive :=
   .consCase 1 <| .consCase 2 <| .consCase 3 <| .nilCase FourFive
 
@@ -64,13 +104,14 @@ theorem termStyleProof : OneTwoThree.isPrefixOf OneToFive :=
 
 -- ## Verified Algorithms
 
+-- This algorithm (function) returns true iff the firs input was a prefix of the second
 def List.checkIsPrefixOf {α : Type u} [DecidableEq α] : List α → List α → Bool
   | .nil, _ => true
   | .cons val₁ l₁, .cons val₂ l₂ =>
       if val₁ = val₂ then l₁.checkIsPrefixOf l₂ else false
   | _, _ => false
 
-
+-- Let's prove our claim, ie. the correctness of the algorithm
 theorem algoVerified {α : Type u} [DecidableEq α] :
   ∀ l L : List α, l.checkIsPrefixOf L = true ↔ l.isPrefixOf L := by
     intro l
@@ -114,10 +155,7 @@ theorem algoVerified {α : Type u} [DecidableEq α] :
                     exact h
             · rw [if_neg C]
               constructor
-              ·
-                -- intro ohNo
-                -- apply False.elim
-                -- apply Bool.noConfusion ohNo
+              · -- we've seen this case before ; let's watch some automation in action
                 simp
               · intro h
                 cases h with
@@ -127,14 +165,20 @@ theorem algoVerified {α : Type u} [DecidableEq α] :
                     apply Eq.refl
 
 
-
-
+-- Again, we want to show that 1,2,3 is a prefix of 1,2,3,4,5
 theorem viaVerified : OneTwoThree.isPrefixOf OneToFive := by
   rw [← algoVerified]
+  -- we express this via the output of our algorithm
   apply Eq.refl
+  -- The above says that the result holds by reflexivity of equality, but the sides aren't the same ?!
+  -- When comparing expressions, Lean may "reduce" them, and in this case it amounts to computing the
+  -- ouput of the algorithm, so that after the reduction, the goal is actually `true = true` which
+  -- indeed follows from reflexivity.
 
 #print viaVerified
 
+
+-- **Todo** add comments for ↓
 
 -- # Algorithms that certify
 
@@ -271,27 +315,3 @@ example {α : Type u} [DecidableEq α] :
             | cons h i =>
               specialize e f g h i rfl rfl
               contradiction
-
-
-
-
-
-
-
-
--- # Appendix
-
-example {α : Type u} [DecidableEq α] :
-  ∀ l L : List α, l.checkIsPrefixOf L = true ↔ l.isPrefixOf L := by
-    intro l L
-    induction l, L using Expo.List.certifyIsPrefixOf.induct
-    · dsimp [List.checkIsPrefixOf]
-      constructor
-      · intro _
-        apply List.isPrefixOf.nilCase
-      · intro _
-        apply Eq.refl
-    · sorry
-    · sorry
-    · sorry
-    · sorry
