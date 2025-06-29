@@ -176,50 +176,71 @@ theorem viaVerified : OneTwoThree.isPrefixOf OneToFive := by
   -- indeed follows from reflexivity.
 
 #print viaVerified
+-- The proofs are different !
+#print termStyleProof
 
 
--- **Todo** add comments for ↓
-
+#exit
 -- # Algorithms that certify
 
+
+-- Writing proofs that a list is a prefix of another is so simple that it feels like it can be automated.
+-- This can be done too ! Here, we look at look at the internal representation of lists, and build an
+-- internal representation of a proof that `left` is a prefix of `right`
 partial def tryProof (left right : Expr) : TacticM Expr := do
-    let left ← whnf left
-    let right ← whnf right
     let (lh,largs) := left.getAppFnArgs
     if lh == `Expo.List.nil
-    then
+    then -- if the `left` list is empty ...
       let proof ← mkAppM `Expo.List.isPrefixOf.nilCase #[right]
+      -- ... return the rule that says empty lists are prefixes of any list
       return proof
     else
       let (_,rargs) := right.getAppFnArgs
+      -- otherwise, build the proof for the tails of the lists ...
       let sofar ← tryProof largs[2]! rargs[2]!
+      -- .. and use the other rule to extend the proof to the current lists
       let extend ← mkAppM `Expo.List.isPrefixOf.consCase #[largs[1]!, sofar]
       return extend
 
 
-
+-- Here's how we get to run this "tactic"
 elab "tryCertify" : tactic => do
+  -- We get the goal that we're trying to prove
   let g ← getMainTarget
   let (h,args) := g.getAppFnArgs
   if h != `Expo.List.isPrefixOf
+    -- This "tactic" only proves stuff about lists being prefixes: throw an error if it's misused
     then throwError "This tactic only works when the goal is a prefix relation !"
   let left := args[1]!
   let right := args[2]!
+  -- We'll unfold the defintions of lists to get their value
+    let left ← whnf left
+    let right ← whnf right
   let proof ← tryProof left right
+  -- Build the proof and use it to solve the goal
   closeMainGoal `tryCertify proof
 
+-- Here it is in action
 theorem viaCertified : OneTwoThree.isPrefixOf OneToFive := by
   tryCertify
 
 #print viaCertified
+-- They're the same proof
 #print termStyleProof
 
+
+-- Now, we didn't check if the lists really were prefixes of one another, did we ?
+-- What happens if we try to use the "tactic" to prove that 6 is a prefix of 1,2,3,4,5 ?
 theorem ohNo : (List.cons 6 .nil).isPrefixOf OneToFive := by
   tryCertify
+  -- The kernel rejects the proof !
+  -- Is the kernel trustworthy ? You may want to look at Mario Carnerio's Lean4Lean
 
 
 
--- # Verified algorithms that certify
+
+
+-- # Appendix : Verified algorithms that certify
 
 inductive POption (β : Sort _) where
 | none
@@ -250,8 +271,8 @@ def POption.isSome {β : Sort _} : POption β → Bool
   | some _ => true
 
 
-example {α : Type u} [DecidableEq α] :
-  ∀ l L : List α, (List.certifyIsPrefixOf l L).isSome ↔ l.isPrefixOf L := by
+theorem verifiedCeritfied {α : Type u} [DecidableEq α] :
+  ∀ l L : List α, (List.certifyIsPrefixOf l L).isSome = true ↔ l.isPrefixOf L := by
     intro l L
     induction l, L using Expo.List.certifyIsPrefixOf.induct
     · dsimp [List.certifyIsPrefixOf, POption.isSome]
@@ -315,3 +336,20 @@ example {α : Type u} [DecidableEq α] :
             | cons h i =>
               specialize e f g h i rfl rfl
               contradiction
+
+
+theorem viaVerifiedCertified : OneTwoThree.isPrefixOf OneToFive := by
+  rw [← verifiedCeritfied]
+  apply Eq.refl
+
+#print viaVerifiedCertified
+
+
+theorem viaVerifiedCertified' : OneTwoThree.isPrefixOf OneToFive :=
+  let res := List.certifyIsPrefixOf OneTwoThree OneToFive
+  match h : res with
+  | .some proof => proof
+  | .none =>
+    by
+    dsimp [res] at h
+    contradiction
