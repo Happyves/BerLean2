@@ -180,7 +180,7 @@ theorem viaVerified : OneTwoThree.isPrefixOf OneToFive := by
 #print termStyleProof
 
 
-#exit
+
 -- # Algorithms that certify
 
 
