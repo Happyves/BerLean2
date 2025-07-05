@@ -97,14 +97,8 @@ def SubgradientDescent
       let sofar := SubgradientDescent Objective init StepSize Subgradients n
       sofar - (StepSize n) * (Subgradients sofar)
 
--- #exit
-#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)) (fun x => 2*(x-1)) 0
-#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)) (fun x => 2*(x-1)) 1
-#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)) (fun x => 2*(x-1)) 2
-#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)) (fun x => 2*(x-1)) 3
-#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)) (fun x => 2*(x-1)) 10
 
-
+-- converges to minimum
 #eval SubgradientDescent (F Float) 10.42 (fun n => 1 / (n+3)) (fun x => 2*(x-1)) 0
 #eval SubgradientDescent (F Float) 10.42 (fun n => 1 / (n+3)) (fun x => 2*(x-1)) 1
 #eval SubgradientDescent (F Float) 10.42 (fun n => 1 / (n+3)) (fun x => 2*(x-1)) 2
@@ -112,6 +106,24 @@ def SubgradientDescent
 #eval SubgradientDescent (F Float) 10.42 (fun n => 1 / (n+3)) (fun x => 2*(x-1)) 10
 #eval SubgradientDescent (F Float) 10.42 (fun n => 1 / (n+3)) (fun x => 2*(x-1)) 20
 #eval SubgradientDescent (F Float) 10.42 (fun n => 1 / (n+3)) (fun x => 2*(x-1)) 30
+
+-- oscillates
+#eval SubgradientDescent (F Float) 5 (fun _ => 1) (fun x => 2*(x-1)) 0
+#eval SubgradientDescent (F Float) 5 (fun _ => 1) (fun x => 2*(x-1)) 1
+#eval SubgradientDescent (F Float) 5 (fun _ => 1) (fun x => 2*(x-1)) 2
+#eval SubgradientDescent (F Float) 5 (fun _ => 1) (fun x => 2*(x-1)) 3
+#eval SubgradientDescent (F Float) 5 (fun _ => 1) (fun x => 2*(x-1)) 4
+
+--converges, but not to minimum
+#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)^3) (fun x => 2*(x-1)) 0
+#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)^3) (fun x => 2*(x-1)) 1
+#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)^3) (fun x => 2*(x-1)) 2
+#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)^3) (fun x => 2*(x-1)) 3
+#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)^3) (fun x => 2*(x-1)) 10
+#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)^3) (fun x => 2*(x-1)) 20
+#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)^3) (fun x => 2*(x-1)) 30
+
+
 
 
 -- Follows "Convex Optimisation algorithms" by Bertsekas, chapter 3.2
