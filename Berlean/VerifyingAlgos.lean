@@ -40,6 +40,11 @@ integers, or even lists of lists.
 def OneTwoThree : List Nat :=
   .cons 1 <| .cons 2 <| .cons 3 .nil
 
+-- With polymorphism, we can define lists of lists
+-- ↓ would be (1,2),(3)
+example : List (List Nat) :=
+  .cons (.cons 1 <| .cons 2 .nil) <| .cons (.cons 3 .nil) .nil
+
 
 def FourFive : List Nat :=
   .cons 4 <| .cons 5 .nil
@@ -164,6 +169,41 @@ theorem algoVerified {α : Type u} [DecidableEq α] :
                     apply C
                     apply Eq.refl
 
+example {α : Type u} [DecidableEq α] :
+  ∀ l L : List α, l.checkIsPrefixOf L = true ↔ l.isPrefixOf L := by
+    intro l
+    induction l with
+      | nil =>
+        grind [List.checkIsPrefixOf, List.isPrefixOf.nilCase]
+      | cons val₁ nx₁ ih =>
+        intro L
+        cases L with
+          | nil =>
+            dsimp [List.checkIsPrefixOf]
+            constructor
+            · grind
+            · intro ohNo
+              apply False.elim
+              cases ohNo
+          | cons val₂ nx₂ =>
+            dsimp [List.checkIsPrefixOf]
+            by_cases C : val₁ = val₂
+            · rw [C]
+              rw [if_pos (by apply Eq.refl)]
+              constructor
+              · grind [List.isPrefixOf.consCase]
+              · intro h
+                cases h with
+                  | consCase _ h =>
+                    grind
+            · rw [if_neg C]
+              constructor
+              · grind
+              · intro h
+                cases h with
+                  | consCase _ h =>
+                    grind
+
 
 -- Again, we want to show that 1,2,3 is a prefix of 1,2,3,4,5
 theorem viaVerified : OneTwoThree.isPrefixOf OneToFive := by
@@ -234,8 +274,8 @@ theorem viaCertified : OneTwoThree.isPrefixOf OneToFive := by
 theorem ohNo : (List.cons 6 .nil).isPrefixOf OneToFive := by
   tryCertify
   -- The kernel rejects the proof !
-  -- Is the kernel trustworthy ? You may want to look at Mario Carnerio's Lean4Lean
-
+  -- Is the kernel trustworthy ? You may want to look at Mario Carnerio's Lean4Lean at
+  -- https://github.com/digama0/lean4lean
 
 
 

@@ -2,41 +2,9 @@
 import Mathlib.Data.Real.Basic
 import Mathlib.Tactic
 
-#check 1
-
--- #synth Field Float
-
-
--- #eval dist (1 : ℚ) 2
-
-
-#check Float
-#check ℝ
-
-#check Pow.pow
-
-#check Float.ofNat
-#check OfNat
-
-set_option pp.all true in
-#check (1 : Real)
-
-#synth OfNat Real 1
-#synth OfNat Float 2
-
-#print instOfNatAtLeastTwo
-#print instOfNatFloat
-
--- #synth NatCast Float
-#synth NatCast Real
 
 instance : NatCast Float where
   natCast := Float.ofNat
-
-#synth NatCast Float
-
-#synth HPow Real Nat Real
--- #synth HPow Float Nat Float
 
 instance : HPow Float Nat Float :=
   let rec go (x : Float) : Nat → Float
@@ -44,96 +12,150 @@ instance : HPow Float Nat Float :=
     | n+1 => x*(go x n)
   ⟨go⟩
 
-#synth HPow Float Nat Float
 
 
+-- # Subgradient descent
+
+/-
+This is a minimalist exposition of how one can do scientific computing in Lean.
+For a proper scientific computing library in Lean, consult Tomáš Skřivan's SciLean
+(https://lecopivo.github.io/scientific-computing-lean/)
+
+We follow the exposition of chapter 3.2 of "Convex Optimization Algorithms" by Bertsekas.
+-/
+
+-- We want to minimise the following function
 def F (S : Type) [Add S] [Sub S] [Mul S] [NatCast S] [HPow S Nat S] (x : S) :=
   2*x^2 - 4*x + 5
 
-
+-- We can minmise it over floats
 #eval F Float 0
 #eval F Float 1
 #eval F Float 2
 #eval F Float 2.3e-1
 
+-- Or over rationals !
 #eval F ℚ 0
 #eval F ℚ 1
 #eval F ℚ 2
 #eval F ℚ (23 / 100)
 
+-- It even has a meaning for matrices!
+#eval F (Matrix (Fin 2) (Fin 2) ℕ) !![0,1 ; 2,3]
 
 
--- 2*(x-1)^2 + 3 = 2*x^2 -4*x +5
-
-#check 1
 /-
-
-(2*(y-1)^2 + 3) - (2*(x-1)^2 + 3) ≥ (4*(x-1))*(y - x)
-(y-1)^2 - (x-1)^2 ≥ (2*(x-1))*(y - x)
-(y-1)^2 - (x-1)^2 ≥ (2*(x-1))*((y-1) - (x-1))
-u^2 - v^2 ≥ (2*v)*(u - v)
-(u - v)*(u + v) ≥ (2*v)*(u - v)
-if u = v → 0 ≥ 0
-if u > v → (c)
-  u+v ≥ 2*v
-  v+v ≥ 2*v by (c) and trans
-if u < v → (c)
-  u+v ≤ 2*v
-  v+v ≤ 2*v by (c) and trans
-
-Subgradient x ↦ 2*(x-1)
+We'll study `F` over ℝ.
+Assume we don't remember the following from highschool
 -/
+theorem canonical (x : ℝ) : 2*x^2 -4*x +5 = 2*(x-1)^2 + 3 := by
+  nth_rewrite 2 [pow_two]
+  rw [mul_sub_left_distrib]
+  rw [mul_sub_right_distrib]
+  rw [mul_one]
+  rw [one_mul]
+  rw [sub_sub]
+  rw [add_sub]
+  rw [← two_mul]
+  rw [mul_sub]
+  rw [mul_sub]
+  rw [mul_one]
+  rw [← pow_two]
+  rw [← mul_assoc]
+  rw [sub_add]
+  rw [sub_add]
+  congr 1
+  rw [sub_sub]
+  congr 1
+  · rw [show (4 : ℝ) = 2*2  by norm_num]
+  · norm_num
 
 
+theorem withAutomation (x : ℝ) : 2*x^2 -4*x +5 = 2*(x-1)^2 + 3 := by
+  ring
+
+#print canonical
+#print withAutomation
+
+/- We'll use the following algorithm to find the minimum-/
 def SubgradientDescent
   {S : Type} [Sub S] [Mul S]
-  (Objective : S → S)
-  (init : S)
-  (StepSize : ℕ → S)
-  (Subgradients : S → S)
-  : ℕ → S
+  (Objective : S → S) -- the function we want to minimise
+  (init : S) -- the initial point
+  (StepSize : ℕ → S) -- we'll takes steps towards the minimum : this regulates their size
+  (Subgradients : S → S) -- a mystirious oracle that tells us in which direction to take steps
+  : ℕ → S -- as final input, we take the number of iterations, and we output the minimser candidate
   | 0 => init
   | n + 1 =>
       let sofar := SubgradientDescent Objective init StepSize Subgradients n
+      -- We compute the nth point ↑ with a recursive call, and return the step taken ↓
       sofar - (StepSize n) * (Subgradients sofar)
 
 
--- converges to minimum
-#eval SubgradientDescent (F Float) 10.42 (fun n => 1 / (n+3)) (fun x => 2*(x-1)) 0
-#eval SubgradientDescent (F Float) 10.42 (fun n => 1 / (n+3)) (fun x => 2*(x-1)) 1
-#eval SubgradientDescent (F Float) 10.42 (fun n => 1 / (n+3)) (fun x => 2*(x-1)) 2
-#eval SubgradientDescent (F Float) 10.42 (fun n => 1 / (n+3)) (fun x => 2*(x-1)) 3
-#eval SubgradientDescent (F Float) 10.42 (fun n => 1 / (n+3)) (fun x => 2*(x-1)) 10
-#eval SubgradientDescent (F Float) 10.42 (fun n => 1 / (n+3)) (fun x => 2*(x-1)) 20
-#eval SubgradientDescent (F Float) 10.42 (fun n => 1 / (n+3)) (fun x => 2*(x-1)) 30
-
--- oscillates
-#eval SubgradientDescent (F Float) 5 (fun _ => 1) (fun x => 2*(x-1)) 0
-#eval SubgradientDescent (F Float) 5 (fun _ => 1) (fun x => 2*(x-1)) 1
-#eval SubgradientDescent (F Float) 5 (fun _ => 1) (fun x => 2*(x-1)) 2
-#eval SubgradientDescent (F Float) 5 (fun _ => 1) (fun x => 2*(x-1)) 3
-#eval SubgradientDescent (F Float) 5 (fun _ => 1) (fun x => 2*(x-1)) 4
-
---converges, but not to minimum
-#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)^3) (fun x => 2*(x-1)) 0
-#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)^3) (fun x => 2*(x-1)) 1
-#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)^3) (fun x => 2*(x-1)) 2
-#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)^3) (fun x => 2*(x-1)) 3
-#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)^3) (fun x => 2*(x-1)) 10
-#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)^3) (fun x => 2*(x-1)) 20
-#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)^3) (fun x => 2*(x-1)) 30
 
 
+-- converges to minimiser
+#eval SubgradientDescent (F Float) 10.42 (fun n => 1 / (n+1)) (fun x => 4*(x-1)) 0
+#eval SubgradientDescent (F Float) 10.42 (fun n => 1 / (n+1)) (fun x => 4*(x-1)) 1
+#eval SubgradientDescent (F Float) 10.42 (fun n => 1 / (n+1)) (fun x => 4*(x-1)) 2
+#eval SubgradientDescent (F Float) 10.42 (fun n => 1 / (n+1)) (fun x => 4*(x-1)) 3
+#eval SubgradientDescent (F Float) 10.42 (fun n => 1 / (n+1)) (fun x => 4*(x-1)) 4
+#eval SubgradientDescent (F Float) 10.42 (fun n => 1 / (n+1)) (fun x => 4*(x-1)) 5
+#eval SubgradientDescent (F Float) 10.42 (fun n => 1 / (n+1)) (fun x => 4*(x-1)) 10
+#eval SubgradientDescent (F Float) 10.42 (fun n => 1 / (n+1)) (fun x => 4*(x-1)) 20
+#eval SubgradientDescent (F Float) 10.42 (fun n => 1 / (n+1)) (fun x => 4*(x-1)) 30
 
+-- convergence speed depends of the stepsize
+#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)^(1/4)) (fun x => 4*(x-1)) 0
+#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)^(1/4)) (fun x => 4*(x-1)) 1
+#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)^(1/4)) (fun x => 4*(x-1)) 2
+#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)^(1/4)) (fun x => 4*(x-1)) 3
+#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)^(1/4)) (fun x => 4*(x-1)) 4
+#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)^(1/4)) (fun x => 4*(x-1)) 5
+#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)^(1/4)) (fun x => 4*(x-1)) 6
+#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)^(1/4)) (fun x => 4*(x-1)) 10
+#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)^(1/4)) (fun x => 4*(x-1)) 20
+#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)^(1/4)) (fun x => 4*(x-1)) 50
+#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)^(1/4)) (fun x => 4*(x-1)) 60
+#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)^(1/4)) (fun x => 4*(x-1)) 70
 
--- Follows "Convex Optimisation algorithms" by Bertsekas, chapter 3.2
+--converges, but not to minimiser
+#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)^3) (fun x => 4*(x-1)) 0
+#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)^3) (fun x => 4*(x-1)) 1
+#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)^3) (fun x => 4*(x-1)) 2
+#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)^3) (fun x => 4*(x-1)) 3
+#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)^3) (fun x => 4*(x-1)) 10
+#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)^3) (fun x => 4*(x-1)) 20
+#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)^3) (fun x => 4*(x-1)) 30
+#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)^3) (fun x => 4*(x-1)) 50
 
+-- We can also use constant step sizes
+#eval SubgradientDescent (F Float) 5 (fun _ => 1 / 42) (fun x => 4*(x-1)) 0
+#eval SubgradientDescent (F Float) 5 (fun _ => 1 / 42) (fun x => 4*(x-1)) 1
+#eval SubgradientDescent (F Float) 5 (fun _ => 1 / 42) (fun x => 4*(x-1)) 2
+#eval SubgradientDescent (F Float) 5 (fun _ => 1 / 42) (fun x => 4*(x-1)) 3
+#eval SubgradientDescent (F Float) 5 (fun _ => 1 / 42) (fun x => 4*(x-1)) 10
+#eval SubgradientDescent (F Float) 5 (fun _ => 1 / 42) (fun x => 4*(x-1)) 20
+#eval SubgradientDescent (F Float) 5 (fun _ => 1 / 42) (fun x => 4*(x-1)) 70
 
+-- This one seems to diverge !
+#eval SubgradientDescent (F Float) 5 (fun _ => 1) (fun x => 4*(x-1)) 0
+#eval SubgradientDescent (F Float) 5 (fun _ => 1) (fun x => 4*(x-1)) 1
+#eval SubgradientDescent (F Float) 5 (fun _ => 1) (fun x => 4*(x-1)) 2
+#eval SubgradientDescent (F Float) 5 (fun _ => 1) (fun x => 4*(x-1)) 3
+#eval SubgradientDescent (F Float) 5 (fun _ => 1) (fun x => 4*(x-1)) 10
+#eval SubgradientDescent (F Float) 5 (fun _ => 1) (fun x => 4*(x-1)) 20
+#eval SubgradientDescent (F Float) 5 (fun _ => 1) (fun x => 4*(x-1)) 70
 
+-- We'll prove a little theorem that gives us conditions on the step size to yield convergence
+
+-- A lemma
 theorem Bounds
   (Objective : ℝ → ℝ) (init : ℝ) (StepSize : ℕ → ℝ) (Subgradients : ℝ → ℝ)
   (posSteps : ∀ i, StepSize i > 0)
   (subgradientProp : ∀ x, ∀ y, Objective x - Objective y ≤ Subgradients x * (x - y))
+  -- ↑ is the property about so-called "subgradients" that makes subgradient descent work !
+  -- It' usually states as `Objective y - Objective x ≥ Subgradients x * (y - x)` though
   (y : ℝ) (n : ℕ) :
     let nth := SubgradientDescent Objective init StepSize Subgradients
     (nth (n+1) - y)^2 ≤ (nth n - y)^2 - 2*(StepSize n)*(Objective (nth n) - Objective y) + (StepSize n)^2 * (Subgradients (nth n))^2 :=
@@ -171,6 +193,50 @@ theorem Bounds
         · apply subgradientProp
 
 
+-- Our `F` admits subgradients
+theorem SubgradientForF (x y : ℝ) : (2*(y-1)^2 + 3) - (2*(x-1)^2 + 3) ≥ (4*(x-1))*(y - x) := by
+  have help_1 : (2*(y-1)^2 + 3) - (2*(x-1)^2 + 3) = 2*((y-1)^2 - (x-1)^2 ) := by
+    ring
+  rw [help_1]
+  clear help_1
+  rw [mul_assoc]
+  rw [show (4 : ℝ) = 2*2  by norm_num]
+  rw [mul_assoc]
+  rw [ge_iff_le]
+  rw [mul_le_mul_left (show 0 < (2 : ℝ)  by norm_num)]
+  rw [show y - x = (y-1) - (x-1) by ring]
+  set u := x-1
+  set v := y - 1
+  rw [sq_sub_sq]
+  rw [← mul_assoc]
+  have h := lt_trichotomy u v
+  cases h with
+    | inl h =>
+        rw [← sub_pos] at h
+        rw [mul_le_mul_right h]
+        rw [sub_pos] at h
+        rw [two_mul]
+        apply add_le_add_right
+        apply le_of_lt
+        exact h
+    | inr h =>
+        cases h with
+          | inl h =>
+              rw [h]
+              rw [sub_self]
+              rw [mul_zero]
+              rw [mul_zero]
+          | inr h =>
+              rw [← sub_neg] at h
+              rw [mul_le_mul_right_of_neg h]
+              rw [sub_neg] at h
+              rw [two_mul]
+              apply add_le_add_right
+              apply le_of_lt
+              exact h
+
+
+-- Same as `Bounds`, but with shorter notation and more automation
 example (f : ℝ → ℝ) (x₀ : ℝ) (s : ℕ → ℝ) (δ : ℝ → ℝ)
   (posSteps : ∀ i, s i > 0)
   (subgradientProp : ∀ x, ∀ y, f x - f y ≤ δ x * (x - y))
@@ -201,7 +267,11 @@ theorem ItDoesGoDown
   (posSteps : ∀ i, s i > 0)
   (subgradientProp : ∀ x, ∀ y, f x - f y ≤ δ x * (x - y))
   (min : ℝ)
-  -- (minIsMin: ∀ x, f min ≤ f x) isn't necessary : it is implied by `convenientSteps` for the iterates
+  --  (minIsMin:
+  --      let x := SubgradientDescent f x₀ s δ
+  --      ∀ n, f min ≤ f (x n))
+  -- ↑ isn't necessary : it is implied by `convenientSteps` just below
+  -- (but it's in Proposition 3.2.2(b) in our source :P)
   (n : ℕ)
   (convenientSteps :
       let x := SubgradientDescent f x₀ s δ
@@ -246,24 +316,56 @@ def SubgradientDescentTR
   {S : Type} [Sub S] [Mul S]
   (Objective : S → S)
   (init : S)
-  (StepSize : S)
+  (StepSize : ℕ → S) -- should be increasing!
   (Subgradients : S → S)
   : ℕ → S
   | 0 => init
   | n + 1 =>
-      let next := init - (StepSize) * (Subgradients init)
+      let next := init - (StepSize n) * (Subgradients init)
       SubgradientDescentTR Objective next StepSize Subgradients n
 
+-- Difference not really noticable for few iterations
+#eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)^(1/4)) (fun x => 4*(x-1)) 9001
+#eval SubgradientDescentTR (F Float) 5 (fun n => 1 / (n+1)^(1/4)) (fun x => 4*(x-1)) 9001
 
+
+-- #eval SubgradientDescent (F Float) 5 (fun n => 1 / (n+1)^(1/4)) (fun x => 4*(x-1)) 90000000
+
+-- But ↑ overflows on my machine, whereas ↓ just takes ages
+
+-- #eval SubgradientDescentTR (F Float) 5 (fun n => 1 / (n+1)^(1/4)) (fun x => 4*(x-1)) 90000000
+
+
+/-
+Side effect is that step-size get's indexed "in reverse".
+
+For example, for 3 iterations we have
+3 : init → init - (StepSize 2) * (Subgradients init)
+2 : ⋯ → init - (StepSize 2) * (Subgradients init) - (StepSize 1) * (Subgradients ⋯)
+1 : ⋯ → init - (StepSize 2) * (Subgradients init) - (StepSize 1) * (Subgradients ⋯) - (StepSize 0) * (Subgradients ⋯)
+-/
+
+
+#eval SubgradientDescentTR (F Float) 10.42 (fun n => (1/9)*(n-1)) (fun x => 4*(x-1)) 10
+#eval SubgradientDescentTR (F Float) 10.42 (fun n => (1/19)*(n-1)) (fun x => 4*(x-1)) 20
+#eval SubgradientDescentTR (F Float) 10.42 (fun n => (1/29)*(n-1)) (fun x => 4*(x-1)) 30
+#eval SubgradientDescentTR (F Float) 10.42 (fun n => (1/30)*(n-1)) (fun x => 4*(x-1)) 31
+#eval SubgradientDescentTR (F Float) 10.42 (fun n => (1/31)*(n-1)) (fun x => 4*(x-1)) 32
+#eval SubgradientDescentTR (F Float) 10.42 (fun n => (1/32)*(n-1)) (fun x => 4*(x-1)) 33
+#eval SubgradientDescentTR (F Float) 10.42 (fun n => (1/33)*(n-1)) (fun x => 4*(x-1)) 34
+
+
+-- This also affects proofs we want to do about the function
 example
   {S : Type} [Sub S] [Mul S]
   (Objective : S → S)
   (init : S)
-  (StepSize :  S)
+  (StepSize :  Nat → S)
   (Subgradients : S → S)
   (n : Nat) :
     let nth := SubgradientDescentTR Objective init StepSize Subgradients
-    (nth (n+1)) = (nth n) - (StepSize) * (Subgradients (nth n)) := by
+    let nth' := SubgradientDescentTR Objective init (fun n => StepSize (n+1)) Subgradients
+    (nth (n+1)) = (nth' n) - (StepSize 0) * (Subgradients (nth' n)) := by
     revert init
     induction' n with n ih
     · intro _
@@ -271,4 +373,6 @@ example
     · intro init
       dsimp
       rw [SubgradientDescentTR.eq_2]
+      nth_rewrite 2 [SubgradientDescentTR.eq_2]
+      nth_rewrite 2 [SubgradientDescentTR.eq_2]
       apply ih
