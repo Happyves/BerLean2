@@ -106,6 +106,12 @@ theorem termStyleProof : OneTwoThree.isPrefixOf OneToFive :=
   .consCase 1 <| .consCase 2 <| .consCase 3 <| .nilCase FourFive
 
 
+-- And now it's your turn
+theorem isPrefixOf_append
+  {α : Type u} (l L : List α) : l.isPrefixOf (l.append L) := by
+    sorry
+
+
 
 -- ## Verified Algorithms
 
@@ -393,3 +399,17 @@ theorem viaVerifiedCertified' : OneTwoThree.isPrefixOf OneToFive :=
     by
     dsimp [res] at h
     contradiction
+
+
+-- # Appendix : solution
+
+example
+  {α : Type u} (l L : List α) : l.isPrefixOf (l.append L) := by
+  induction l with
+    | nil =>
+        rw [List.append.eq_1]
+        apply List.isPrefixOf.nilCase
+    | cons val l ih =>
+        rw [List.append.eq_2]
+        apply List.isPrefixOf.consCase
+        exact ih
