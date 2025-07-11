@@ -1,5 +1,6 @@
 
 import Lean
+import Mathlib.Data.Nat.Basic
 
 open Lean Meta Elab Tactic
 
@@ -27,30 +28,30 @@ inductive List (α : Type u) where
 deriving Repr
 
 /-
-If you've never programmed before, here's a short explanation. The above are instructions
+If you've never programmed before, here's a short explaℕion. The above are instructions
 for your computer on how to store the entries of the list. `cons` will, given the adresses
 of `val` and the remainder of the list `nx`, allocate new memory that contains the latter
 adresses, at a new adress it returns. `nil` instructs that we hav reached the end of the list.
 
-This definition makes use of type polymorphism : we use it to define lists of natural number,
+This definition makes use of type polymorphism : we use it to define lists of ℕural number,
 integers, or even lists of lists.
 -/
 
 -- This is how we define the list 1,2,3
-def OneTwoThree : List Nat :=
+def OneTwoThree : List ℕ :=
   .cons 1 <| .cons 2 <| .cons 3 .nil
 
 -- With polymorphism, we can define lists of lists
 -- ↓ would be (1,2),(3)
-example : List (List Nat) :=
+example : List (List ℕ) :=
   .cons (.cons 1 <| .cons 2 .nil) <| .cons (.cons 3 .nil) .nil
 
 
-def FourFive : List Nat :=
+def FourFive : List ℕ :=
   .cons 4 <| .cons 5 .nil
 
--- We define the length of the list as a function that takes a list and returns a natural number
-def List.length {α : Type u} : List α → Nat
+-- We define the length of the list as a function that takes a list and returns a ℕural number
+def List.length {α : Type u} : List α → ℕ
   -- Since lisls are built from `cons` and `nil`, we have to specify what to do in each case
   | .nil => 0
     -- the empty list has length 0
@@ -73,30 +74,34 @@ def List.append {α : Type u} : List α → List α → List α
 def OneToFive :=
   List.append OneTwoThree FourFive
 
+
+
 -- Let's prove that the length of two appended lists is the sum of their lengths
-theorem theoremName {α : Type u} (l L : List α) : (l.append L).length = l.length + L.length := by
+theorem theoremName {α : Type u} (a b : List α) : (a.append b).length = a.length + b.length := by
   -- Click at the end of the lines of code and look at the "InfoView" to your right to follow along
-  induction l with
+  induction a with
   -- The proof is by induction on the list
     | nil => -- the base case
       -- Here, we show the result for empt lists
-      dsimp [List.append]
-      dsimp [List.length]
+      rw [List.append.eq_1]
+      rw [List.length.eq_1]
       rw [Nat.zero_add]
     | cons v l ih => -- the induction step
       -- Assume the result is true the the remainder of a list built with `cons` :
       -- we show that we may then derive the result for the list.
-      dsimp [List.append]
-      dsimp [List.length]
+      rw [List.append.eq_2]
+      rw [List.length.eq_2]
+      rw [List.length.eq_2]
       rw [ih]
       rw [Nat.add_assoc]
+
 
 -- Next up, we define what ot means for a list to be a prefix of another
 inductive List.isPrefixOf {α : Type u}  : List α → List α → Prop where
   -- We give two rule from which we allow the relation to follow :
   | nilCase (l : List α) : List.isPrefixOf .nil l
       -- the empty list is the prefix of any list
-  | consCase (val : α) {l L : List α} (proof : List.isPrefixOf l L) : List.isPrefixOf (.cons val l) (.cons val L)
+  | consCase (val : α) {a b : List α} (proof : List.isPrefixOf a b) : List.isPrefixOf (.cons val a) (.cons val b)
       -- if two lists have the same lead, and the tail of the first is a prefix of that of the second
       -- the the first is a prefix of the second
 
@@ -108,7 +113,7 @@ theorem termStyleProof : OneTwoThree.isPrefixOf OneToFive :=
 
 -- And now it's your turn
 theorem isPrefixOf_append
-  {α : Type u} (l L : List α) : l.isPrefixOf (l.append L) := by
+  {α : Type u} (a b : List α) : a.isPrefixOf (a.append b) := by
     sorry
 
 
@@ -175,6 +180,7 @@ theorem algoVerified {α : Type u} [DecidableEq α] :
                     apply C
                     apply Eq.refl
 
+
 example {α : Type u} [DecidableEq α] :
   ∀ l L : List α, l.checkIsPrefixOf L = true ↔ l.isPrefixOf L := by
     intro l
@@ -234,6 +240,9 @@ theorem viaVerified : OneTwoThree.isPrefixOf OneToFive := by
 -- This can be done too ! Here, we look at look at the internal representation of lists, and build an
 -- internal representation of a proof that `left` is a prefix of `right`
 partial def tryProof (left right : Expr) : TacticM Expr := do
+    -- We'll unfold the defintions of lists to get their value
+    let left ← whnf left
+    let right ← whnf right
     let (lh,largs) := left.getAppFnArgs
     if lh == `Expo.List.nil
     then -- if the `left` list is empty ...
@@ -259,9 +268,6 @@ elab "tryCertify" : tactic => do
     then throwError "This tactic only works when the goal is a prefix relation !"
   let left := args[1]!
   let right := args[2]!
-  -- We'll unfold the defintions of lists to get their value
-    let left ← whnf left
-    let right ← whnf right
   let proof ← tryProof left right
   -- Build the proof and use it to solve the goal
   closeMainGoal `tryCertify proof
@@ -284,9 +290,61 @@ theorem ohNo : (List.cons 6 .nil).isPrefixOf OneToFive := by
   -- https://github.com/digama0/lean4lean
 
 
+-- Finally, we'll make some adjustements to our tactic to illustrate a point
+partial def tryHarderProof (left right : Expr) : TacticM (Expr × _root_.List MVarId) := do
+    let left ← whnf left
+    let right ← whnf right
+    let (lh,largs) := left.getAppFnArgs
+    if lh == `Expo.List.nil
+    then
+      let proof ← mkAppM `Expo.List.isPrefixOf.nilCase #[right]
+      return (proof, [])
+    else
+      let (_,rargs) := right.getAppFnArgs
+      let (sofar, nextGoals) ← tryHarderProof largs[2]! rargs[2]!
+      let newGoalType ← mkAppM `Eq #[largs[1]!, rargs[1]!]
+      let newGoal ← mkFreshExprMVar <| .some newGoalType
+      let listType := newGoalType.getAppArgs[0]!
+      withLocalDecl `dummy .default listType <| fun dummy => do
+        let dummyRight ← mkAppM `Expo.List.cons #[dummy, rargs[2]!]
+        let preMotive ← mkAppM `Expo.List.isPrefixOf #[left, dummyRight]
+        let motive := Expr.lam `dummy listType (preMotive.abstract #[dummy]) .default
+        let extend ← mkAppM `Expo.List.isPrefixOf.consCase #[largs[1]!, sofar]
+        let final ← mkAppOptM `Eq.ndrec #[.none, largs[1]!, motive, extend, rargs[1]!, newGoal]
+        return (final, newGoal.mvarId! :: nextGoals)
+
+elab "tryCertifyHard" : tactic => do
+  let g ← getMainTarget
+  let (h,args) := g.getAppFnArgs
+  if h != `Expo.List.isPrefixOf
+    then throwError "This tactic only works when the goal is a prefix relation !"
+  let left := args[1]!
+  let right := args[2]!
+  let (proof, newGoals) ← tryHarderProof left right
+  (← getMainGoal).assign proof
+  replaceMainGoal newGoals
+
+-- This time, we want the "tactic" to give us the euqlity of list entries as sub-goals
+example : OneTwoThree.isPrefixOf OneToFive := by
+  tryCertifyHard
+  · rfl
+  · rfl
+  · rfl
+
+-- This is convenient for *interactive* theorem proving, since user doesn't have to
+-- apply the routine `List.isPrefixOf.consCase` and `List.isPrefixOf.nilCase`, and
+-- leaves parts of the proof that can't be done systematically to the user.
+example (n m : ℕ) (h₁ : n + m = 42) (h₂ : m = n * 5) :
+  (List.cons 42 <| .cons m .nil).isPrefixOf (.cons (n + m) <| .cons (5 * n) <| .cons 37 .nil) := by
+  tryCertifyHard
+  · rw [h₁]
+  · rw [Nat.mul_comm]
+    apply h₂
+
 
 
 -- # Appendix : Verified algorithms that certify
+
 
 inductive POption (β : Sort _) where
 | none

@@ -311,82 +311,17 @@ theorem ItDoesGoDown
 -- # Appendix
 
 
+-- What about performance ? Isn't the recursion we used previously grocely inefficient ?
+-- It is, which is why we'll give a "tail recursive" version of it
+
 def SubgradientDescentTR
   {S : Type} [Sub S] [Mul S]
   (init : S)
-  (StepSize : ℕ → S) -- should be increasing!
-  (Subgradients : S → S)
-  : ℕ → S
-  | 0 => init
-  | n + 1 =>
-      let next := init - (StepSize n) * (Subgradients init)
-      SubgradientDescentTR next StepSize Subgradients n
-
--- Difference not really noticable for few iterations
-#eval SubgradientDescent  (5 : Float) (fun n => 1 / (n+1)^(1/4)) (fun x => 4*(x-1)) 9001
-#eval SubgradientDescentTR  (5 : Float) (fun n => 1 / (n+1)^(1/4)) (fun x => 4*(x-1)) 9001
-
-
--- #eval SubgradientDescent  (5 : Float) (fun n => 1 / (n+1)^(1/4)) (fun x => 4*(x-1)) 90000000
-
--- But ↑ overflows on my machine, whereas ↓ just takes ages
-
--- #eval SubgradientDescentTR  (5 : Float) (fun n => 1 / (n+1)^(1/4)) (fun x => 4*(x-1)) 90000000
-
-
-/-
-Side effect is that step-size get's indexed "in reverse".
-
-For example, for 3 iterations we have
-3 : init → init - (StepSize 2) * (Subgradients init)
-2 : ⋯ → init - (StepSize 2) * (Subgradients init) - (StepSize 1) * (Subgradients ⋯)
-1 : ⋯ → init - (StepSize 2) * (Subgradients init) - (StepSize 1) * (Subgradients ⋯) - (StepSize 0) * (Subgradients ⋯)
--/
-
-
-#eval SubgradientDescentTR  (10.42 : Float) (fun n => (1/9)*(n-1)) (fun x => 4*(x-1)) 10
-#eval SubgradientDescentTR  (10.42 : Float) (fun n => (1/19)*(n-1)) (fun x => 4*(x-1)) 20
-#eval SubgradientDescentTR  (10.42 : Float) (fun n => (1/29)*(n-1)) (fun x => 4*(x-1)) 30
-#eval SubgradientDescentTR  (10.42 : Float) (fun n => (1/30)*(n-1)) (fun x => 4*(x-1)) 31
-#eval SubgradientDescentTR  (10.42 : Float) (fun n => (1/31)*(n-1)) (fun x => 4*(x-1)) 32
-#eval SubgradientDescentTR  (10.42 : Float) (fun n => (1/32)*(n-1)) (fun x => 4*(x-1)) 33
-#eval SubgradientDescentTR  (10.42 : Float) (fun n => (1/33)*(n-1)) (fun x => 4*(x-1)) 34
-
-
--- This also affects proofs we want to do about the function
-example
-  {S : Type} [Sub S] [Mul S]
-  (init : S)
-  (StepSize :  Nat → S)
-  (Subgradients : S → S)
-  (n : Nat) :
-    let nth := SubgradientDescentTR init StepSize Subgradients
-    let nth' := SubgradientDescentTR init (fun n => StepSize (n+1)) Subgradients
-    (nth (n+1)) = (nth' n) - (StepSize 0) * (Subgradients (nth' n)) := by
-    revert init
-    induction' n with n ih
-    · intro _
-      dsimp!
-    · intro init
-      dsimp
-      rw [SubgradientDescentTR.eq_2]
-      nth_rewrite 2 [SubgradientDescentTR.eq_2]
-      nth_rewrite 2 [SubgradientDescentTR.eq_2]
-      apply ih
-
-
-
--- # Appendix of the appendix
-
--- Alternative Tail recursive version
-
-def SubgradientDescentTR2
-  {S : Type} [Sub S] [Mul S]
-  (init : S)
-  (StepSize : ℕ → S) -- should be increasing!
+  (StepSize : ℕ → S)
   (Subgradients : S → S)
   (iterations : ℕ) : S :=
   let rec go (init : S) : ℕ → S
+    -- here the input number represent the number of iteration *to be accomplished*
     | 0 => init
     | n + 1 =>
         let next := init - (StepSize (iterations - (n+1))) * (Subgradients init)
@@ -396,40 +331,54 @@ def SubgradientDescentTR2
 
 
 
-#eval SubgradientDescentTR2  (10.42 : Float) (fun n => 1 / (n+1)) (fun x => 4*(x-1)) 0
-#eval SubgradientDescentTR2  (10.42 : Float) (fun n => 1 / (n+1)) (fun x => 4*(x-1)) 1
-#eval SubgradientDescentTR2  (10.42 : Float) (fun n => 1 / (n+1)) (fun x => 4*(x-1)) 2
-#eval SubgradientDescentTR2  (10.42 : Float) (fun n => 1 / (n+1)) (fun x => 4*(x-1)) 3
-#eval SubgradientDescentTR2  (10.42 : Float) (fun n => 1 / (n+1)) (fun x => 4*(x-1)) 4
-#eval SubgradientDescentTR2  (10.42 : Float) (fun n => 1 / (n+1)) (fun x => 4*(x-1)) 5
-#eval SubgradientDescentTR2  (10.42 : Float) (fun n => 1 / (n+1)) (fun x => 4*(x-1)) 10
+#eval SubgradientDescentTR  (10.42 : Float) (fun n => 1 / (n+1)) (fun x => 4*(x-1)) 0
+#eval SubgradientDescentTR  (10.42 : Float) (fun n => 1 / (n+1)) (fun x => 4*(x-1)) 1
+#eval SubgradientDescentTR  (10.42 : Float) (fun n => 1 / (n+1)) (fun x => 4*(x-1)) 2
+#eval SubgradientDescentTR  (10.42 : Float) (fun n => 1 / (n+1)) (fun x => 4*(x-1)) 3
+#eval SubgradientDescentTR  (10.42 : Float) (fun n => 1 / (n+1)) (fun x => 4*(x-1)) 4
+#eval SubgradientDescentTR  (10.42 : Float) (fun n => 1 / (n+1)) (fun x => 4*(x-1)) 5
+#eval SubgradientDescentTR  (10.42 : Float) (fun n => 1 / (n+1)) (fun x => 4*(x-1)) 10
 
 
+-- The difference isn't really noticable for a small number of iterations
+-- #eval SubgradientDescent  (5 : Float) (fun n => 1 / (n+1)^(1/4)) (fun x => 4*(x-1)) 9001
+-- #eval SubgradientDescentTR  (5 : Float) (fun n => 1 / (n+1)^(1/4)) (fun x => 4*(x-1)) 9001
+
+
+-- #eval SubgradientDescentTR  (5 : Float) (fun n => 1 / (n+1)^(1/4)) (fun x => 4*(x-1)) 900000000000
+
+-- But ↑ runs (for a long time), whereas ↓ overflows on my machine
+
+-- #eval SubgradientDescent  (5 : Float) (fun n => 1 / (n+1)^(1/4)) (fun x => 4*(x-1)) 900000000000
+
+-- A side effect is that it makes theorems we previously took for granted ...
+#check SubgradientDescent.eq_2
+-- ... a bit harder to prove
 example
   {S : Type} [Sub S] [Mul S]
   (init : S)
   (StepSize :  Nat → S)
   (Subgradients : S → S)
   (n : Nat) :
-    let nth := SubgradientDescentTR2 init StepSize Subgradients
+    let nth := SubgradientDescentTR init StepSize Subgradients
     (nth (n+1)) = (nth n) - (StepSize n) * (Subgradients (nth n)) := by
     dsimp
-    unfold SubgradientDescentTR2
+    unfold SubgradientDescentTR
     have gen :
       ∀ m, ∀ init,
-      SubgradientDescentTR2.go StepSize Subgradients (m + 1) init (n + 1) =
-      SubgradientDescentTR2.go StepSize Subgradients m init n -
-        StepSize m * Subgradients (SubgradientDescentTR2.go StepSize Subgradients m init n) := by
+      SubgradientDescentTR.go StepSize Subgradients (m + 1) init (n + 1) =
+      SubgradientDescentTR.go StepSize Subgradients m init n -
+        StepSize m * Subgradients (SubgradientDescentTR.go StepSize Subgradients m init n) := by
       induction' n with n ih
       · intro _ _
-        rw [SubgradientDescentTR2.go.eq_2]
-        rw [SubgradientDescentTR2.go.eq_1]
-        rw [SubgradientDescentTR2.go.eq_1]
+        rw [SubgradientDescentTR.go.eq_2]
+        rw [SubgradientDescentTR.go.eq_1]
+        rw [SubgradientDescentTR.go.eq_1]
         rw [Nat.zero_add, Nat.succ_sub_one]
       · intro m init
-        rw [SubgradientDescentTR2.go.eq_2]
-        nth_rewrite 2 [SubgradientDescentTR2.go.eq_2]
-        nth_rewrite 2 [SubgradientDescentTR2.go.eq_2]
+        rw [SubgradientDescentTR.go.eq_2]
+        nth_rewrite 2 [SubgradientDescentTR.go.eq_2]
+        nth_rewrite 2 [SubgradientDescentTR.go.eq_2]
         have help : (m + 1) - (n + 1 + 1) = m - (n+1) := by
           rw [Nat.succ_sub_succ]
         rw [help]
