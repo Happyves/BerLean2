@@ -149,6 +149,50 @@ def SubgradientDescent
 #eval SubgradientDescent  (5 : Float) (fun _ => 1) (fun x => 4*(x-1)) 20
 #eval SubgradientDescent  (5 : Float) (fun _ => 1) (fun x => 4*(x-1)) 70
 
+
+-- Our `F` admits subgradients
+theorem SubgradientForF (x y : ℝ) : (2*(y-1)^2 + 3) - (2*(x-1)^2 + 3) ≥ (4*(x-1))*(y - x) := by
+  have help_1 : (2*(y-1)^2 + 3) - (2*(x-1)^2 + 3) = 2*((y-1)^2 - (x-1)^2 ) := by
+    ring
+  rw [help_1]
+  clear help_1
+  rw [mul_assoc]
+  rw [show (4 : ℝ) = 2*2  by norm_num]
+  rw [mul_assoc]
+  rw [ge_iff_le]
+  rw [mul_le_mul_left (show 0 < (2 : ℝ)  by norm_num)]
+  rw [show y - x = (y-1) - (x-1) by ring]
+  set u := x-1
+  set v := y - 1
+  rw [sq_sub_sq]
+  rw [← mul_assoc]
+  have h := lt_trichotomy u v
+  cases h with
+    | inl h =>
+        rw [← sub_pos] at h
+        rw [mul_le_mul_right h]
+        rw [sub_pos] at h
+        rw [two_mul]
+        apply add_le_add_right
+        apply le_of_lt
+        exact h
+    | inr h =>
+        cases h with
+          | inl h =>
+              rw [h]
+              rw [sub_self]
+              rw [mul_zero]
+              rw [mul_zero]
+          | inr h =>
+              rw [← sub_neg] at h
+              rw [mul_le_mul_right_of_neg h]
+              rw [sub_neg] at h
+              rw [two_mul]
+              apply add_le_add_right
+              apply le_of_lt
+              exact h
+
+
 -- We'll prove a little theorem that gives us conditions on the step size to yield convergence
 
 -- A lemma
@@ -193,50 +237,6 @@ theorem Bounds
           · apply posSteps
           · exact zero_lt_two
         · apply subgradientProp
-
-
--- Our `F` admits subgradients
-theorem SubgradientForF (x y : ℝ) : (2*(y-1)^2 + 3) - (2*(x-1)^2 + 3) ≥ (4*(x-1))*(y - x) := by
-  have help_1 : (2*(y-1)^2 + 3) - (2*(x-1)^2 + 3) = 2*((y-1)^2 - (x-1)^2 ) := by
-    ring
-  rw [help_1]
-  clear help_1
-  rw [mul_assoc]
-  rw [show (4 : ℝ) = 2*2  by norm_num]
-  rw [mul_assoc]
-  rw [ge_iff_le]
-  rw [mul_le_mul_left (show 0 < (2 : ℝ)  by norm_num)]
-  rw [show y - x = (y-1) - (x-1) by ring]
-  set u := x-1
-  set v := y - 1
-  rw [sq_sub_sq]
-  rw [← mul_assoc]
-  have h := lt_trichotomy u v
-  cases h with
-    | inl h =>
-        rw [← sub_pos] at h
-        rw [mul_le_mul_right h]
-        rw [sub_pos] at h
-        rw [two_mul]
-        apply add_le_add_right
-        apply le_of_lt
-        exact h
-    | inr h =>
-        cases h with
-          | inl h =>
-              rw [h]
-              rw [sub_self]
-              rw [mul_zero]
-              rw [mul_zero]
-          | inr h =>
-              rw [← sub_neg] at h
-              rw [mul_le_mul_right_of_neg h]
-              rw [sub_neg] at h
-              rw [two_mul]
-              apply add_le_add_right
-              apply le_of_lt
-              exact h
-
 
 -- Same as `Bounds`, but with shorter notation and more automation
 example (f : ℝ → ℝ) (x₀ : ℝ) (s : ℕ → ℝ) (δ : ℝ → ℝ)
@@ -305,6 +305,9 @@ theorem ItDoesGoDown
             · apply sq_pos_of_ne_zero
               exact also
             · exact convenientSteps
+
+-- (how could we define `convenientSteps` without `also`)
+#eval (1 : ℚ) / 0
 
 
 
