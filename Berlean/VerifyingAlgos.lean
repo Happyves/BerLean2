@@ -61,6 +61,7 @@ def List.length {α : Type u} : List α → ℕ
 
 -- This command allows us to interpret code right away
 #eval OneTwoThree.length
+#eval List.length OneTwoThree
 #eval FourFive.length
 
 -- Here's how we append two list
@@ -68,6 +69,12 @@ def List.append {α : Type u} : List α → List α → List α
   | .nil, l => l
   | .cons val nx, l => .cons val <| append nx l
 
+def List.append' {α : Type u} (a b : List α) : List α :=
+  match b, a with
+  | .nil, l => l
+  | .cons val nx, l => .cons val <| append' l nx
+
+-- #exit
 -- 1,2,3 and 4,5 yields 1,2,3,4,5
 #eval List.append OneTwoThree FourFive
 
@@ -77,7 +84,8 @@ def OneToFive :=
 
 
 -- Let's prove that the length of two appended lists is the sum of their lengths
-theorem theoremName {α : Type u} (a b : List α) : (a.append b).length = a.length + b.length := by
+theorem theoremName {α : Type u} (a b : List α) :
+  (a.append b).length = a.length + b.length := by
   -- Click at the end of the lines of code and look at the "InfoView" to your right to follow along
   induction a with
   -- The proof is by induction on the list
@@ -114,8 +122,23 @@ theorem termStyleProof : OneTwoThree.isPrefixOf OneToFive :=
 -- And now it's your turn
 theorem isPrefixOf_append
   {α : Type u} (a b : List α) : a.isPrefixOf (a.append b) := by
-    sorry
+    induction a with
+      | nil =>
+        apply List.isPrefixOf.nilCase
+      | cons val tail someame =>
+          apply List.isPrefixOf.consCase
+          apply someame
 
+example
+  {α : Type u} (l L : List α) : l.isPrefixOf (l.append L) := by
+  induction l with
+    | nil =>
+        rw [List.append.eq_1]
+        apply List.isPrefixOf.nilCase
+    | cons val l ih =>
+        rw [List.append.eq_2]
+        apply List.isPrefixOf.consCase
+        exact ih
 
 
 

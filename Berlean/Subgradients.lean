@@ -16,6 +16,7 @@ instance : HPow Float Nat Float :=
 
 
 
+
 -- # Subgradient descent
 
 /-
@@ -357,7 +358,7 @@ def SubgradientDescentTR
 -- A side effect is that it makes theorems we previously took for granted ...
 #check SubgradientDescent.eq_2
 -- ... a bit harder to prove
-example
+theorem unfoldThm
   {S : Type} [Sub S] [Mul S]
   (init : S)
   (StepSize :  Nat → S)
@@ -387,3 +388,14 @@ example
         rw [help]
         apply ih
     apply gen
+
+-- With the following theorem however, we can choose the version that is more comfortable to prove things with
+theorem sameFunction
+  {S : Type} [Sub S] [Mul S] (init : S) (StepSize : ℕ → S) (Subgradients : S → S) :
+  SubgradientDescentTR init StepSize Subgradients = SubgradientDescent init StepSize Subgradients := by
+  funext n
+  induction' n with n ih
+  · dsimp [SubgradientDescentTR, SubgradientDescentTR.go, SubgradientDescent]
+  · rw [unfoldThm]
+    rw [SubgradientDescent.eq_2]
+    rw [ih]
