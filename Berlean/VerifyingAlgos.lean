@@ -55,7 +55,7 @@ def List.length {α : Type u} : List α → ℕ
   -- Since lisls are built from `cons` and `nil`, we have to specify what to do in each case
   | .nil => 0
     -- the empty list has length 0
-  | .cons _ nx => 1 + nx.length
+  | .cons _ nx => 1 + List.length nx
     -- for a list strating with `cons`, we recursivly compute the length of its remainder,
     -- and increment it by 1.
 
@@ -482,6 +482,16 @@ theorem viaVerifiedCertified' : OneTwoThree.isPrefixOf OneToFive :=
     dsimp [res] at h
     contradiction
 
+instance {α : Type u} [DecidableEq α] {l L : List α} : Decidable (l.isPrefixOf L) :=
+  if h : (List.certifyIsPrefixOf l L).isSome
+  then
+    .isTrue (by rw [← verifiedCeritfied] ; exact h)
+  else
+    .isFalse (by rw [← verifiedCeritfied] ; exact h)
+
+
+theorem viaVerifiedCertifiedViaDecide : OneTwoThree.isPrefixOf OneToFive := by
+  decide
 
 -- # Appendix : solution
 
